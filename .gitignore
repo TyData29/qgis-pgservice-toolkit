@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+journal_conversion.csv
+journal_switch.csv
+_backup_pgservice/
+_backup_switch_service/
