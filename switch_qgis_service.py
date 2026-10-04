@@ -195,7 +195,9 @@ def main() -> None:
     # relecture qu'un horodatage seul, et deux executions rapprochees (aller
     # puis retour) ne peuvent pas ecraser mutuellement leurs sauvegardes.
     horodatage = f"{dt.datetime.now():%Y%m%d_%H%M%S}_{args.src}_vers_{args.dst}"
-    backup_dir = (args.backup_dir or (args.racine / BACKUP_DIRNAME)) / horodatage
+    # En simulation, --liste se passe de --backup-dir : rien n'est sauvegarde.
+    base_sauvegarde = args.backup_dir or (args.racine / BACKUP_DIRNAME if args.racine else None)
+    backup_dir = base_sauvegarde / horodatage if base_sauvegarde else None
 
     rows: list[dict] = []
     n_modifies = 0

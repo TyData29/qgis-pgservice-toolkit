@@ -299,7 +299,7 @@ def write_atomic(path: Path, data: bytes) -> None:
         raise
 
 
-def collecter_projets(racine: Path | None, liste: Path | None, backup_dir: Path) -> list[Path]:
+def collecter_projets(racine: Path | None, liste: Path | None, backup_dir: Path | None) -> list[Path]:
     if liste is not None:
         chemins = []
         for ligne in liste.read_text(encoding="utf-8-sig").splitlines():
@@ -366,7 +366,9 @@ def main() -> None:
     dbnames = set(args.dbnames) or None
 
     horodatage = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = (args.backup_dir or (args.racine / BACKUP_DIRNAME)) / horodatage
+    # En simulation, --liste se passe de --backup-dir : rien n'est sauvegarde.
+    base_sauvegarde = args.backup_dir or (args.racine / BACKUP_DIRNAME if args.racine else None)
+    backup_dir = base_sauvegarde / horodatage if base_sauvegarde else None
 
     rows: list[dict[str, str]] = []
     n_projets_modifies = 0
