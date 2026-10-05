@@ -245,9 +245,20 @@ def process_qgz(
     rows: list[dict[str, str]],
     dbnames: set[str] | None = None,
 ):
+    return process_qgz_bytes(path.read_bytes(), str(path), service, exclude_hosts, rows, dbnames)
+
+
+def process_qgz_bytes(
+    data: bytes,
+    chemin_log: str,
+    service: str,
+    exclude_hosts: set[str],
+    rows: list[dict[str, str]],
+    dbnames: set[str] | None = None,
+):
     """Decompresse, convertit le .qgs interne, recompresse en preservant les
     pieces jointes du projet (.qgd notamment)."""
-    with zipfile.ZipFile(path) as zin:
+    with zipfile.ZipFile(io.BytesIO(data)) as zin:
         infos = zin.infolist()
         qgs_names = [i.filename for i in infos if i.filename.lower().endswith(".qgs")]
         if not qgs_names:
@@ -256,7 +267,7 @@ def process_qgz(
         contents = {info.filename: (info, zin.read(info.filename)) for info in infos}
 
     new_qgs_bytes, nb_conversions = process_xml(
-        contents[qgs_name][1], service, exclude_hosts, f"{path}!{qgs_name}", rows, dbnames
+        contents[qgs_name][1], service, exclude_hosts, f"{chemin_log}!{qgs_name}", rows, dbnames
     )
     if nb_conversions == 0:
         return None, 0
@@ -264,11 +275,11 @@ def process_qgz(
     contents[qgs_name] = (contents[qgs_name][0], new_qgs_bytes)
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as zout:
-        for info, data in contents.values():
+        for info, contenu in contents.values():
             new_info = zipfile.ZipInfo(filename=info.filename, date_time=info.date_time)
             new_info.compress_type = info.compress_type
             new_info.external_attr = info.external_attr
-            zout.writestr(new_info, data)
+            zout.writestr(new_info, contenu)
     return buffer.getvalue(), nb_conversions
 
 
