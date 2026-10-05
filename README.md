@@ -22,9 +22,11 @@ Idempotent : une couche deja convertie (`service=` present) est laissee de cote.
 Bascule les projets d'un nom de service a un autre, dans les deux sens. Sert a tester une migration sur un panel de projets avant de la generaliser, puis a revenir en arriere si besoin.
 
 ```
-python switch_qgis_service.py <racine> --from prod --to prod_test [--apply]
-python switch_qgis_service.py --liste panel.txt --from prod --to prod_test [--apply]
+python switch_qgis_service.py <racine> --from prod --to prod_test [--apply] [--backup-dir DOSSIER] [--log FICHIER]
+python switch_qgis_service.py --liste panel.txt --from prod --to prod_test --backup-dir DOSSIER [--apply] [--log FICHIER]
 ```
+
+Avec `<racine>`, les sauvegardes vont par defaut dans `<racine>/_backup_switch_service/<horodatage>`. Avec `--liste`, les projets peuvent etre disperses : `--backup-dir` est alors obligatoire des que `--apply` est utilise (inutile en simulation).
 
 Une couche qui porte deja le service cible est laissee telle quelle : relancer le script deux fois de suite ne produit rien de plus.
 
