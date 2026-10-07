@@ -114,20 +114,27 @@ def schemas_avec_projets(conn) -> list[str]:
 
 
 def creer_table_sauvegarde(conn, schema: str) -> None:
+    """Cree la table de sauvegarde au besoin. Si elle existe deja sans les
+    colonnes sauvegarde_le/lot (laissee par une version anterieure du script,
+    ou par un clonage de base qui ne les a pas reprises), elle est completee :
+    `create table if not exists` ne verifie pas la structure d'une table
+    preexistante, l'insertion de sauvegarde echouerait sinon avec une colonne
+    manquante."""
+    cible = sql.SQL("{}.{}").format(sql.Identifier(schema), sql.Identifier(TABLE_SAUVEGARDE))
     with conn.cursor() as cur:
         cur.execute(
-            sql.SQL(
-                "create table if not exists {}.{} ("
-                "like {}.{}, "
-                "sauvegarde_le timestamptz not null default now(), "
-                "lot text not null)"
-            ).format(
-                sql.Identifier(schema),
-                sql.Identifier(TABLE_SAUVEGARDE),
-                sql.Identifier(schema),
-                sql.Identifier(TABLE_PROJETS),
+            sql.SQL("create table if not exists {} (like {}.{})").format(
+                cible, sql.Identifier(schema), sql.Identifier(TABLE_PROJETS)
             )
         )
+        cur.execute(
+            sql.SQL("alter table {} add column if not exists sauvegarde_le timestamptz not null default now()").format(
+                cible
+            )
+        )
+        # Pas de contrainte not null : une ligne preexistante hors de ce
+        # script n'a pas de lot connu, et ne doit pas bloquer la creation.
+        cur.execute(sql.SQL("alter table {} add column if not exists lot text").format(cible))
     conn.commit()
 
 
