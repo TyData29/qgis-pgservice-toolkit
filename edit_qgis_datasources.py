@@ -3,11 +3,13 @@
 
 Deux operations, separees ou ensemble :
 
---schema ANCIEN=NOUVEAU (repetable) : les couches qui lisent ANCIEN."table"
+--schema ANCIEN=NOUVEAU (repetable, plusieurs anciens separes par des virgules) :
+les couches qui lisent ANCIEN."table"
 lisent NOUVEAU."table". Sert a passer d'un schema a un autre de meme
 structure, par exemple d'un ancien millesime du cadastre au millesime courant.
 Garde-fous :
-- --tables-cible donne la liste des tables du schema cible (une par ligne) :
+- --tables-cible donne la liste des tables du schema cible (une par ligne,
+  export CSV d'une colonne accepte) :
   une couche dont la table n'y figure pas est laissee intacte
   (statut table_absente_cible) ;
 - un projet qui lit deja plusieurs schemas d'un meme regroupement (les anciens
@@ -306,15 +308,18 @@ def traiter_base(args, regles: Regles, rows: list[dict[str, str]]) -> tuple[int,
 def lire_regles(args) -> Regles:
     schemas: dict[str, str] = {}
     for paire in args.schema:
-        ancien, sep, nouveau = paire.partition("=")
-        if not sep or not ancien or not nouveau or ancien == nouveau:
-            sys.exit(f"--schema attend ANCIEN=NOUVEAU : {paire!r}")
-        schemas[ancien] = nouveau
+        anciens, sep, nouveau = paire.partition("=")
+        noms = [a.strip() for a in anciens.split(",") if a.strip()]
+        if not sep or not noms or not nouveau or nouveau in noms:
+            sys.exit(f"--schema attend ANCIEN=NOUVEAU ou ANCIEN1,ANCIEN2=NOUVEAU : {paire!r}")
+        for ancien in noms:
+            schemas[ancien] = nouveau
     tables: dict[str, set[str]] = {}
     if schemas:
         if not args.tables_cible:
             sys.exit("--schema demande --tables-cible : la liste des tables du schema cible, une par ligne.")
-        noms = {l.strip() for l in args.tables_cible.read_text(encoding="utf-8-sig").splitlines() if l.strip()}
+        # Un nom par ligne ; les guillemets d'un export CSV (pgAdmin) sont ignores.
+        noms = {l.strip().strip('"') for l in args.tables_cible.read_text(encoding="utf-8-sig").splitlines() if l.strip()}
         tables = {cible: noms for cible in set(schemas.values())}
         if len(set(schemas.values())) > 1:
             sys.exit("Un seul schema cible par passage : --tables-cible ne decrit qu'un schema.")
@@ -331,7 +336,7 @@ def main() -> None:
                         help="Avec --conn : schema contenant une table qgis_projects, repetable (defaut : tous)")
     parser.add_argument("--projet", dest="projets", action="append", default=[], metavar="NOM",
                         help="Avec --conn : nom de projet a traiter, repetable (defaut : tous)")
-    parser.add_argument("--schema", action="append", default=[], metavar="ANCIEN=NOUVEAU",
+    parser.add_argument("--schema", action="append", default=[], metavar="ANCIEN[,ANCIEN2]=NOUVEAU",
                         help="Repointe les couches du schema ANCIEN vers NOUVEAU, repetable")
     parser.add_argument("--tables-cible", type=Path, help="Tables existantes du schema cible, une par ligne")
     parser.add_argument("--retirer-identifiants", action="append", default=[], metavar="ROLE",
