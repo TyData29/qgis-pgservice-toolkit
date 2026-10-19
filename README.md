@@ -53,6 +53,27 @@ Avec `<racine>`, les sauvegardes vont par defaut dans `<racine>/_backup_switch_s
 
 Une couche qui porte deja le service cible est laissee telle quelle : relancer le script deux fois de suite ne produit rien de plus.
 
+### edit_qgis_datasources.py
+
+Modifie en masse les sources PostgreSQL des couches, sur des fichiers (dossier ou `--liste`) ou sur des projets stockes en base (`--conn`, memes options et meme sauvegarde que `convert_qgis_pgservice_db.py`). Deux operations, separees ou ensemble :
+
+- `--schema ANCIEN=NOUVEAU` (repetable) : les couches qui lisent `ANCIEN."table"` lisent `NOUVEAU."table"`, par exemple pour passer d'un ancien millesime du cadastre au millesime courant. `--tables-cible` (obligatoire) donne la liste des tables du schema cible, une par ligne : une couche dont la table n'y figure pas est laissee intacte (`table_absente_cible`). Un projet qui lit deja plusieurs schemas d'un meme regroupement (les anciens et le nouveau) est laisse intact pour cette operation (`projet_multi_schemas`) : il compare sans doute des millesimes.
+- `--retirer-identifiants ROLE` (repetable) : supprime `user=` et `password=` des couches connectees avec ce role. QGIS utilise alors l'utilisateur du service, ou demande l'identifiant a l'ouverture.
+
+```
+python edit_qgis_datasources.py <racine> --schema ancien=nouveau --tables-cible tables.txt [--apply]
+python edit_qgis_datasources.py --liste panel.txt --retirer-identifiants generique --backup-dir DOSSIER [--apply]
+python edit_qgis_datasources.py --conn "service=prod" [--schema-projets S] [--projet NOM] --schema ancien=nouveau --tables-cible tables.txt [--apply]
+```
+
+Liste des tables du schema cible, avec psql :
+
+```
+psql "service=prod" -X -t -A -c "select table_name from information_schema.tables where table_schema = 'nouveau'" -o tables.txt
+```
+
+Sauvegardes dans `<racine>/_backup_edit_sources/<horodatage>` (ou `--backup-dir`), ou dans `<schema>.qgis_projects_bak` pour les projets en base. Journal : `journal_edit_sources.csv`.
+
 ## Points communs
 
 - **Simulation par defaut.** Rien n'est ecrit sans `--apply`.
