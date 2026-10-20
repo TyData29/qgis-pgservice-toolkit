@@ -249,14 +249,28 @@ def traiter_base(args, regles: Regles, rows: list[dict[str, str]]) -> tuple[int,
     try:
         with conn.cursor() as cur:
             cur.execute("set lock_timeout = '10s'")
+            # Contexte reel de la session : un service ou un reglage de role (ALTER ROLE ... SET role)
+            # peut mener ailleurs que prevu.
+            cur.execute("select inet_server_addr(), inet_server_port(), current_database(), session_user, current_user")
+            hote, port, base, connexion, actif = cur.fetchone()
         conn.commit()
+        print(f"Connecte a {hote}:{port}, base {base}, en tant que {connexion} (role actif : {actif})")
         disponibles = schemas_avec_projets(conn)
+        print(f"Tables {TABLE_PROJETS} trouvees dans : {', '.join(disponibles) or 'aucun schema'}")
         schemas = args.schemas_projets or disponibles
         absents = [s for s in schemas if s not in disponibles]
         if absents:
             sys.exit(f"Pas de table {TABLE_PROJETS} lisible dans : {', '.join(absents)}")
         for schema in schemas:
-            noms = [n for n in lister_projets(conn, schema) if not args.projets or n in args.projets]
+            # Une table qgis_projects illisible pour ce role (droit SELECT absent) est signalee
+            # et sautee : les autres schemas sont traites.
+            try:
+                noms = [n for n in lister_projets(conn, schema) if not args.projets or n in args.projets]
+            except psycopg.Error as exc:
+                conn.rollback()
+                print(f"  [!] {schema}.{TABLE_PROJETS} : lecture refusee, schema ignore ({str(exc).strip()})", file=sys.stderr)
+                echecs.append((f"{schema}.{TABLE_PROJETS}", f"lecture refusee : {str(exc).strip()}"))
+                continue
             if noms and args.apply:
                 creer_table_sauvegarde(conn, schema)
             projets = sql.SQL("{}.{}").format(sql.Identifier(schema), sql.Identifier(TABLE_PROJETS))
